@@ -1,0 +1,9 @@
+{
+  "name": "GeoTiles",
+  "references": [
+    "CesiumRuntime",
+    "Unity.Mathematics"
+  ],
+  "allowUnsafeCode": true,
+  "autoReferenced": true
+}
