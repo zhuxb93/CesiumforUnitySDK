@@ -1,6 +1,6 @@
 # CesiumforUnitySDK
 
-[中文](README.zh-CN.md)
+[Chinese](README.zh-CN.md)
 
 CesiumforUnitySDK is a personal technical archive for Unity 2022.3 and CesiumForUnity. It extracts reusable work around vector-tile mesh generation, GPU instancing, camera keyframe playback, CPU rasterization, and a few small production utilities for 3D globe applications.
 
