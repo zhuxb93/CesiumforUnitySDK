@@ -1,118 +1,119 @@
 # CesiumforUnitySDK
 
-[English](README.en.md) · 个人技术积累仓库
+[中文](README.zh-CN.md) · personal portfolio
 
 ![Unity](https://img.shields.io/badge/Unity-2022.3-black?logo=unity) ![Language](https://img.shields.io/badge/C%23-blue?logo=csharp) ![Cesium](https://img.shields.io/badge/CesiumForUnity-required-1abc9c) ![License](https://img.shields.io/badge/License-MIT-green) ![Purpose](https://img.shields.io/badge/%E7%94%A8%E9%80%94-%E6%8A%80%E6%9C%AF%E7%A7%AF%E7%B4%AF-blueviolet)
 
-CesiumforUnitySDK 是一份面向 Unity 2022.3 与 CesiumForUnity 的个人技术积累仓库，整理三维地球场景中常见的矢量瓦片网格化、GPU 实例化、相机关键帧录播、软光栅烘焙和轻量工具。它不是完整产品，不包含真实业务服务、密钥、商业资产或私有数据；目标是把可复用的工程经验沉淀成相对独立的 Unity Package。
+CesiumforUnitySDK is a personal technical archive for Unity 2022.3 and CesiumForUnity. It collects reusable work around vector-tile mesh generation, GPU instancing, camera keyframe playback, CPU raster baking, and small utilities. It is not a full product and does not include private endpoints, credentials, commercial assets, or business data.
 
-## 架构
+## Architecture
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-sans-serif, system-ui, sans-serif','lineColor':'#94A3B8','edgeLabelBackground':'#F8FAFC'}}}%%
 flowchart LR
-    subgraph IN["数据输入"]
-        SRC["矢量瓦片服务 / 合成数据<br/>(占位, 无真实端点)"]:::ext
-        CES["CesiumForUnity<br/>CesiumGeoreference"]:::ext
+    subgraph IN["Data Input"]
+        SRC("Vector tile service / synthetic data<br/>placeholder · no real endpoint"):::ext
+        CES("CesiumForUnity<br/>CesiumGeoreference"):::ext
     end
-    subgraph REPO["CesiumforUnitySDK 模块"]
-        IFC["Interfaces<br/>ICoordinateConverter / ICameraRig"]:::own
-        VTM["VectorTileMesh<br/>解析·分块·视锥可见性·建网格"]:::own
-        EAR["Triangulation/Earcut<br/>带洞多边形三角化"]:::third
-        GPU["GpuInstancing<br/>BatchRendererGroup 容器"]:::own
-        CAM["CameraKeyframePlayer<br/>关键帧录播 / JSON"]:::own
-        BAK["Baking/SoftRasterizer"]:::own
-        UTL["Utils<br/>序列化·对象池·OBJ"]:::own
+    subgraph REPO["CesiumforUnitySDK Modules"]
+        IFC("Interfaces<br/>ICoordinateConverter · ICameraRig"):::own
+        VTM("VectorTileMesh<br/>parse · chunk · frustum culling · meshing"):::own
+        EAR("Triangulation · Earcut<br/>polygon-with-holes triangulation"):::third
+        GPU("GpuInstancing<br/>BatchRendererGroup container"):::own
+        CAM("CameraKeyframePlayer<br/>keyframe record/play · JSON"):::own
+        BAK("Baking · SoftRasterizer"):::own
+        UTL("Utils<br/>serialization · pool · OBJ"):::own
     end
-    OUT["Unity Mesh + GPU 实例渲染"]:::out
+    OUT(["Unity Mesh + GPU instanced rendering"]):::out
 
     SRC --> VTM
-    CES -. 坐标抽象 .-> IFC
+    CES -. coord abstraction .-> IFC
     IFC --> VTM
     EAR --> VTM
     VTM --> GPU --> OUT
     VTM --> OUT
-    CAM -. 驱动相机 .-> IFC
-    BAK -. 顶点色烘焙 .-> OUT
+    CAM -. drive camera .-> IFC
+    BAK -. vertex-color bake .-> OUT
 
-    classDef own  fill:#0d3b66,stroke:#2f81f7,color:#e6f1ff;
-    classDef third fill:#3b2f63,stroke:#a371f7,color:#f0e9ff;
-    classDef ext  fill:#222b35,stroke:#768390,color:#cdd9e5,stroke-dasharray:4 3;
-    classDef out  fill:#13361f,stroke:#3fb950,color:#d7ffe3;
+    classDef own  fill:#DBEAFE,stroke:#3B82F6,stroke-width:1.5px,color:#1E3A8A;
+    classDef third fill:#EDE9FE,stroke:#8B5CF6,stroke-width:1.5px,color:#5B21B6;
+    classDef ext  fill:#F1F5F9,stroke:#94A3B8,stroke-width:1.5px,color:#334155,stroke-dasharray:4 3;
+    classDef out  fill:#DCFCE7,stroke:#22C55E,stroke-width:1.5px,color:#166534;
 ```
 
-矢量瓦片数据经 `VectorTileMesh` 解析建网格，`GpuInstancing` 批量渲染；与 Cesium 的坐标和相机耦合统一收敛在 `Interfaces`，便于替换或离线测试。
+Vector tile data is parsed into meshes by `VectorTileMesh`, then rendered in batches by `GpuInstancing`. Cesium-related coordinate and camera coupling is narrowed into `Interfaces`, making replacement and offline tests easier.
 
-## 亮点导航
+## Highlights
 
-| 模块 | 作用 | 关键技术 / 依赖 |
+| Module | Role | Key Technology / Dependency |
 | --- | --- | --- |
-| `GpuInstancing/` | 基于 `BatchRendererGroup` 的实例容器，封装 GPU buffer 上传、窗口对齐、可见性裁剪委托。 | BatchRendererGroup, Burst Job, ComputeBuffer |
-| `VectorTileMesh/` | 将建筑、道路、POI、文本等矢量瓦片数据转为 Unity Mesh，并按视锥维护可见瓦片。 | Mesh 管线, Job, 对象池, Cesium 坐标抽象 |
-| `Triangulation/Earcut/` | mapbox earcut 的 C# 移植，用于带洞多边形三角化。 | earcut, ISC |
-| `CameraKeyframePlayer/` | 运行时录制、编辑、播放相机关键帧，并导出 JSON 运镜数据。 | JSON, ICameraRig |
-| `Baking/SoftRasterizer/` | CPU 软光栅化工具，用重心插值把顶点色烘焙到纹理。 | barycentric interpolation |
-| `Utils/` | 二进制序列化、轻量对象池、OBJ 导出等常用工程工具。 | Binary IO, object pool, OBJ |
+| `GpuInstancing/` | A `BatchRendererGroup` instance container for GPU buffer upload, alignment, and visibility hooks. | BatchRendererGroup, Burst Job, ComputeBuffer |
+| `VectorTileMesh/` | Converts building, road, POI, and text vector-tile data into Unity meshes and tracks visible tiles by frustum. | mesh pipeline, jobs, object pools, Cesium coordinate abstraction |
+| `Triangulation/Earcut/` | C# port of mapbox earcut for triangulating polygons with holes. | earcut, ISC |
+| `CameraKeyframePlayer/` | Runtime camera keyframe recording, editing, playback, and JSON export. | JSON, ICameraRig |
+| `Baking/SoftRasterizer/` | CPU raster baking that writes vertex colors to textures with barycentric interpolation. | barycentric interpolation |
+| `Utils/` | Binary serialization, lightweight pooling, OBJ export, and other small tools. | Binary IO, object pool, OBJ |
 
-## 预览
+## Preview
 
-| 计划展示 | 文件名（放入 `docs/images/`） | 内容说明 |
+| Planned View | File Name (place in `docs/images/`) | Description |
 | --- | --- | --- |
-| GPU 实例化 | `gpu-instancing.gif` | 数万实例渲染 + 相机视锥裁剪 |
-| 矢量瓦片 | `vector-tile-mesh.gif` | 建筑 / 道路瓦片随相机动态加载 |
-| 相机运镜 | `camera-keyframe.gif` | 录制关键帧并播放运镜 |
+| GPU instancing | `gpu-instancing.gif` | Tens of thousands of instances plus camera-frustum culling |
+| Vector tiles | `vector-tile-mesh.gif` | Buildings and roads loading dynamically with the camera |
+| Camera motion | `camera-keyframe.gif` | Recording and playing camera keyframes |
 
-<!-- 补图后取消注释：
+<!-- Uncomment after adding media:
 <p align="center">
   <img src="docs/images/gpu-instancing.gif" width="720" alt="GPU instancing preview"><br/>
-  <em>图：GPU 实例化与相机视锥裁剪预览</em>
+  <em>Figure: GPU instancing and camera-frustum culling preview</em>
 </p>
 -->
 
-## 目录结构
+## Directory Structure
 
 ```text
 CesiumforUnitySDK/
-├── GpuInstancing/        # BatchRendererGroup 实例容器
-├── VectorTileMesh/       # 矢量瓦片 → Unity Mesh
-├── Triangulation/Earcut/ # 带洞多边形三角化 (mapbox earcut, ISC)
-├── CameraKeyframePlayer/ # 相机关键帧录播
-├── Baking/SoftRasterizer/# CPU 软光栅烘焙
-├── Interfaces/           # 坐标 / 相机抽象接口
-├── Utils/                # 序列化 / 对象池 / OBJ 导出
-├── Samples~/             # 合成数据示例
+├── GpuInstancing/        # BatchRendererGroup instance container
+├── VectorTileMesh/       # vector tiles → Unity Mesh
+├── Triangulation/Earcut/ # polygon-with-holes triangulation (mapbox earcut, ISC)
+├── CameraKeyframePlayer/ # camera keyframe playback
+├── Baking/SoftRasterizer/# CPU raster baking
+├── Interfaces/           # coordinate / camera abstractions
+├── Utils/                # serialization / pooling / OBJ export
+├── Samples~/             # synthetic sample data
 └── package.json
 ```
 
-## 安装与依赖
+## Installation And Dependencies
 
-1. 在 Unity Package Manager 中选择 `Add package from disk...`，指向本目录的 `package.json`。
-2. 先安装并启用 CesiumForUnity，确保工程可以引用 `CesiumRuntime`。
-3. 安装 `package.json` 中声明的 Unity 官方依赖：`mathematics`、`burst`、`collections`、`newtonsoft-json`。
-4. 如需使用 Cesium ion，请在自己的项目配置中提供 token。示例只使用 `YOUR_CESIUM_ION_TOKEN` 占位，不内置任何密钥。
+1. In Unity Package Manager, choose `Add package from disk...` and select this repository's `package.json`.
+2. Install and enable CesiumForUnity first, and make sure the project can reference `CesiumRuntime`.
+3. Install the Unity package dependencies declared in `package.json`: `mathematics`, `burst`, `collections`, and `newtonsoft-json`.
+4. If you use Cesium ion, provide your token through your own project configuration. This repository only uses the placeholder `YOUR_CESIUM_ION_TOKEN` and does not include credentials.
 
-## 使用建议
+## Usage Notes
 
-先从 `Samples~/README.md` 里的合成数据说明开始，不要直接接入生产瓦片服务。`VectorTileMesh` 中的坐标转换和相机控制已经通过 `ICoordinateConverter`、`ICameraRig` 抽象，方便替换成你自己的 Cesium rig 或离线测试实现。
+Start with the synthetic data notes in `Samples~/README.md`; do not connect production tile services first. Coordinate conversion and camera control in `VectorTileMesh` are abstracted through `ICoordinateConverter` and `ICameraRig`, so you can replace them with your own Cesium rig or offline test implementation.
 
-历史文件名 `InstanceContanier` 已统一更名为 `InstanceContainer`；如从旧代码迁移，需要同步更新引用。
+The historical typo `InstanceContanier` has been renamed to `InstanceContainer`; update references if you migrate older code.
 
-## 许可与脱敏
+## Licensing And Sanitization
 
-- 仓库已移除私有品牌命名、内网地址、真实服务端点、密钥和业务数据。
-- `LICENSE` 仅覆盖本人原创和改写部分。
-- CesiumForUnity、earcut、Unity 官方包和 Newtonsoft Json 等第三方依赖按各自许可使用，详情见 `THIRD_PARTY_NOTICES.md`。
-- 复核记录见 `脱敏复核报告.md`。
+- Private brand names, internal URLs, real service endpoints, credentials, and business data have been removed.
+- `LICENSE` only covers original or rewritten code in this repository.
+- CesiumForUnity, earcut, Unity packages, and Newtonsoft Json remain governed by their own licenses. See `THIRD_PARTY_NOTICES.md`.
+- See `脱敏复核报告.md` for the sanitization review.
 
-## 相关仓库
+## Related Repositories
 
-同一套地理三维工程经验的三个方向，可对照阅读：
+These three repositories describe different directions of the same geospatial 3D engineering experience:
 
-- **[CesiumforUnitySDK](https://github.com/zhuxb93/CesiumforUnitySDK)** — Unity / C#，Cesium 生态下的矢量瓦片渲染与 GPU 实例化。
-- [UnityGeoToolkit](https://github.com/zhuxb93/UnityGeoToolkit) — Unity / C#，地理编辑器导入框架与地形 / 路网 / 雷达工具链。
-- [CesiumforUnrealSDK](https://github.com/zhuxb93/CesiumforUnrealSDK) — Unreal / C++，地球相机与矢量瓦片插件。
+- **[CesiumforUnitySDK](https://github.com/zhuxb93/CesiumforUnitySDK)** — Unity / C#, vector-tile rendering and GPU instancing in the Cesium ecosystem.
+- [UnityGeoToolkit](https://github.com/zhuxb93/UnityGeoToolkit) — Unity / C#, geospatial editor import framework plus terrain / road / radar tooling.
+- [CesiumforUnrealSDK](https://github.com/zhuxb93/CesiumforUnrealSDK) — Unreal / C++, globe camera and vector-tile plugin.
 
-对照点：矢量瓦片渲染（Unity C# ↔ Unreal C++ 双实现）；地理坐标数学（`GeoMath` ↔ `CoordinateConverter`）；相机运镜（关键帧录播 ↔ 地球相机控制器）。
+Comparison points: vector-tile rendering (Unity C# ↔ Unreal C++); geospatial coordinate math (`GeoMath` ↔ `CoordinateConverter`); camera motion (keyframe playback ↔ globe camera controller).
 
-## 当前状态
+## Current Status
 
-本仓已完成源码整理、中文模块说明、英文同步文档、第三方许可清单和脱敏复核。尚未在 Unity Editor 中完成真实导入编译，公开使用前建议先在 Unity 2022.3 工程中跑一轮本地包导入验证。
+The source layout, Chinese module notes, synchronized English README, third-party notices, and sanitization review are complete. The package has not yet been imported and compiled in Unity Editor; run a Unity 2022.3 local package import before production use.
